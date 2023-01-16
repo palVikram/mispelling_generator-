@@ -106,6 +106,30 @@ print('Corrected sentence:', decoded_sentence)
 
 
 
+class AttentionLayer(tf.keras.layers.Layer):
+
+    def __init__(self, **kwargs):
+        super(AttentionLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.W = self.add_weight(name='att_weight', 
+                                 shape=(input_shape[-1], 1),
+                                 initializer='normal')
+        self.b = self.add_weight(name='att_bias', 
+                                 shape=(input_shape[1], 1),
+                                 initializer='zeros')
+        super(AttentionLayer, self).build(input_shape)
+
+    def call(self, inputs):
+        encoder_out, decoder_out = inputs
+        e = tf.tanh(encoder_out + decoder_out)
+        energies = tf.matmul(e, self.W) + self.b
+        alphas = tf.nn.softmax(energies, axis=1)
+        context = tf.reduce_sum(encoder_out * alphas, axis=1)
+        return context, alphas
+    
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], input_shape[-1]), (input_shape[0], input_shape[1])
 
 
 
