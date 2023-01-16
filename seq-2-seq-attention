@@ -1,0 +1,113 @@
+import tensorflow as tf
+from tensorflow.keras.layers import Input, LSTM, Embedding, Dense, Concatenate
+from tensorflow.keras import Model
+
+# Define the encoder
+encoder_inputs = Input(shape=(None,))
+enc_emb = Embedding(input_dim=num_encoder_tokens, output_dim=embedding_dim)(encoder_inputs)
+encoder_lstm = LSTM(latent_dim, return_state=True)
+encoder_outputs, state_h, state_c = encoder_lstm(enc_emb)
+encoder_states = [state_h, state_c]
+
+# Define the decoder
+decoder_inputs = Input(shape=(None,))
+dec_emb_layer = Embedding(num_decoder_tokens, embedding_dim)
+dec_emb = dec_emb_layer(decoder_inputs)
+decoder_lstm = LSTM(latent_dim, return_sequences=True, return_state=True)
+decoder_outputs, _, _ = decoder_lstm(dec_emb, initial_state=encoder_states)
+
+# Attention layer
+attn_layer = AttentionLayer(name='attention_layer')
+attn_out, attn_states = attn_layer([encoder_outputs, decoder_outputs])
+
+# Concat attention input and decoder LSTM output
+decoder_concat_input = Concatenate(axis=-1, name='concat_layer')([decoder_outputs, attn_out])
+
+# Dense layer
+decoder_dense = Dense(num_decoder_tokens, activation='softmax', name='softmax_layer')
+decoder_outputs = decoder_dense(decoder_concat_input)
+
+# Define the model
+model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
+model.compile(optimizer='adam', loss='categorical_crossentropy')
+
+# Train the model
+model.fit([encoder_input_data, decoder_input_data], decoder_target_data, batch_size=batch_size, epochs=epochs)
+
+
+
+# Inference
+encoder_model = Model(encoder_inputs, encoder_states)
+
+decoder_state_input_h = Input(shape=(latent_dim,))
+decoder_state_input_c = Input(shape=(latent_dim,))
+decoder_states_inputs = [decoder_state_input_h, decoder_state_input_c]
+
+dec_emb2 = dec_emb_layer(decoder_inputs) 
+decoder_outputs2, state_h2, state_c2 = decoder_lstm(dec_emb2, initial_state=decoder_states_inputs)
+decoder_states2 = [state_h2, state_c2]
+
+attn_out_inf, attn_states_inf = attn_layer([encoder_outputs, decoder_outputs2])
+decoder_inf_concat = Concatenate(axis=-1, name='concat')([decoder_outputs2, attn_out_inf])
+decoder_outputs2 = decoder_dense(decoder_inf_concat) 
+decoder_model = Model([decoder_inputs] + decoder_states_inputs, [decoder_outputs2] + decoder_states2)
+
+# Reverse-lookup token index to decode sequences back to something readable.
+reverse_input_char_index = dict((i, char) for char, i in input_token_index.items())
+reverse_target_char_index = dict((i, char) for char, i in target_token_index.items())
+
+def decode_sequence(input_seq):
+    states_value = encoder_model.predict(input_seq)
+    target_seq = np.zeros((1,1))
+    target_seq[0, 0] = target_token_index['\t']
+    stop_condition = False
+    decoded_sentence = ''
+    while not stop_condition:
+        output_tokens, h, c = decoder_model.predict([target_seq] + states_value)
+        sampled_token_index = np.argmax(output_tokens[0, -1, :])
+        sampled_char = reverse_target_char_index[sampled_token_index]
+        decoded_sentence += sampled_char
+        if (sampled_char == '\n' or
+           len(decoded_sentence) > max_decoder_seq_length):
+            stop_condition = True
+        target_seq = np.zeros((1,1))
+        target_seq[0, 0] = sampled_token_index
+        states_value = [h, c]
+    return decoded_sentence
+
+input_sentence = 'This is an infference test'
+input_sentence = input_sentence.lower()
+input_sentence = re.sub(r'[^a-z\s]', '', input_sentence)
+input_sentence = '\t' + input_sentence + '\n'
+encoder_input_data = np.zeros((1, max_encoder_seq_length
+
+
+
+
+input_sentence = 'This is an infference test'
+input_sentence = input_sentence.lower()
+input_sentence = re.sub(r'[^a-z\s]', '', input_sentence)
+input_sentence = '\t' + input_sentence + '\n'
+encoder_input_data = np.zeros((1, max_encoder_seq_length), dtype='float32')
+for t, char in enumerate(input_sentence):
+    encoder_input_data[0, t] = input_token_index[char]
+
+decoded_sentence = decode_sequence(encoder_input_data)
+print('Input sentence:', input_sentence)
+print('Corrected sentence:', decoded_sentence)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
